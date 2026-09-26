@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ipynb_checkpoints/
+
+# Work directories for calibration caches, AOG estimates, exported checkpoints and eval outputs
+work/
+outputs/
+logs/
+*.log
+
+# Large binaries are never committed, except the small subspace files under artifacts/
+*.pt
+*.pth
+*.safetensors
+*.npz
+!artifacts/**/*.pt
+
+# Evaluation media
+*.mp4
