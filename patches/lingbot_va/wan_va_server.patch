@@ -1,0 +1,19 @@
+diff --git a/wan_va/wan_va_server.py b/wan_va/wan_va_server.py
+index 4c95ace..9aea03d 100644
+--- a/wan_va/wan_va_server.py
++++ b/wan_va/wan_va_server.py
+@@ -92,6 +92,14 @@ class VA_Server:
+                                             eval_mode=True,
+                                             )
+ 
++        # Q-WAM: replace the block Linears with the packed W4A4 checkpoint named by LB_QUANT_CKPT
++        # (the Q-WAM repository must be on PYTHONPATH). Unset, the model runs in bf16 as upstream.
++        quant_ckpt = os.environ.get("LB_QUANT_CKPT", "").strip()
++        if quant_ckpt:
++            from qwam.lingbot_va.runtime import install_w4a4
++            if install_w4a4(self.transformer, quant_ckpt) == 0:
++                raise RuntimeError(f"LB_QUANT_CKPT={quant_ckpt} replaced no layer")
++
+         self.env_type = job_config.env_type
+         self.streaming_vae_half = None
+         if self.env_type == 'robotwin_tshape':

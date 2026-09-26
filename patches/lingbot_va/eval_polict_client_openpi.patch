@@ -1,0 +1,15 @@
+diff --git a/evaluation/robotwin/eval_polict_client_openpi.py b/evaluation/robotwin/eval_polict_client_openpi.py
+index 7ed5265..d22c33b 100644
+--- a/evaluation/robotwin/eval_polict_client_openpi.py
++++ b/evaluation/robotwin/eval_polict_client_openpi.py
+@@ -6,7 +6,9 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+ import cv2
+ from pathlib import Path
+ 
+-robowin_root = Path("/path/to/your/robowin")
++# RoboTwin checkout: $ROBOTWIN_ROOT, default <repo>/RoboTwin.
++robowin_root = Path(os.environ.get("ROBOTWIN_ROOT",
++                                   Path(__file__).resolve().parents[2] / "RoboTwin"))
+ if str(robowin_root) not in sys.path:
+     sys.path.insert(0, str(robowin_root))
+ 

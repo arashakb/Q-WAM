@@ -1,0 +1,40 @@
+Q-WAM hooks in the ImageWAM RoboTwin policy (upstream 00a4e7afe82a2245f77a95240730a572212edefd).
+
+IW_CALIB_OUT installs the activation-absmax hooks (smoothing calibration), IW_QUANT_CKPT installs
+an exported W4A4 checkpoint after the bf16 weights are loaded; calibration shards are tagged with
+the task name. Apply from the ImageWAM root: git apply <this file>
+
+--- a/experiments/robotwin/imagewam_policy/deploy_policy.py
++++ b/experiments/robotwin/imagewam_policy/deploy_policy.py
+@@ -226,6 +226,21 @@
+         self.model.load_checkpoint(checkpoint_path)
+         self.model = self.model.to(device).eval()
+ 
++        # Q-WAM (qwam must be importable; both hooks are inactive unless their variable is set).
++        #   IW_CALIB_OUT   record per-input-channel activation absmax of the MoT Linears
++        #   IW_QUANT_CKPT  replace the MoT Linears with the exported W4A4 modules
++        if os.environ.get("IW_CALIB_OUT"):
++            from qwam.imagewam import install_absmax_hooks
++            install_absmax_hooks(self.model, os.environ["IW_CALIB_OUT"],
++                                 tag=os.environ.get("IW_CALIB_TAG", ""))
++        if os.environ.get("IW_QUANT_CKPT"):
++            from qwam.imagewam import install_w4a4
++            if install_w4a4(self.model, os.environ["IW_QUANT_CKPT"]) == 0:
++                raise RuntimeError(f"IW_QUANT_CKPT={os.environ['IW_QUANT_CKPT']} replaced 0 Linears")
++        else:
++            print(f"[iw-quant] bf16 arm '{os.environ.get('IMAGEWAM_ARM', '?')}': IW_QUANT_CKPT "
++                  f"unset, model left unquantised", flush=True)
++
+         self.processor: ImageWAMProcessor = instantiate(processor_cfg).eval()
+         dataset_stats = load_dataset_stats_from_json(str(dataset_stats_path))
+         self.processor.set_normalizer_from_stats(dataset_stats)
+@@ -527,6 +542,9 @@
+     sim_cfg_path = usr_args.get("sim_cfg_path")
+     sim_cfg_name = usr_args.get("sim_cfg_name")
+     sim_task = usr_args.get("sim_task")
++    # Calibration shards are tagged with the task so the merge can check task coverage.
++    if os.environ.get("IW_CALIB_OUT") and not os.environ.get("IW_CALIB_TAG"):
++        os.environ["IW_CALIB_TAG"] = str(usr_args.get("task_name") or sim_task or "unknown")
+     cfg = _compose_sim_cfg(
+         sim_cfg_path=sim_cfg_path,
+         sim_cfg_name=sim_cfg_name,

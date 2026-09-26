@@ -1,0 +1,24 @@
+diff --git a/wan_va/configs/va_robotwin_cfg.py b/wan_va/configs/va_robotwin_cfg.py
+index 5fa703f..7f81cc9 100644
+--- a/wan_va/configs/va_robotwin_cfg.py
++++ b/wan_va/configs/va_robotwin_cfg.py
+@@ -1,4 +1,6 @@
+ # Copyright 2024-2025 The Robbyant Team Authors. All rights reserved.
++import os
++
+ from easydict import EasyDict
+ 
+ from .shared_config import va_shared_cfg
+@@ -6,7 +8,11 @@ from .shared_config import va_shared_cfg
+ va_robotwin_cfg = EasyDict(__name__='Config: VA robotwin')
+ va_robotwin_cfg.update(va_shared_cfg)
+ 
+-va_robotwin_cfg.wan22_pretrained_model_name_or_path = "/path/to/pretrained/model"
++# Base model directory: $LINGBOT_CKPT, default <repo>/checkpoints/lingbot-va-posttrain-robotwin.
++va_robotwin_cfg.wan22_pretrained_model_name_or_path = os.environ.get(
++    "LINGBOT_CKPT",
++    os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..",
++                                  "checkpoints", "lingbot-va-posttrain-robotwin")))
+ 
+ va_robotwin_cfg.attn_window = 72
+ va_robotwin_cfg.frame_chunk_size = 2

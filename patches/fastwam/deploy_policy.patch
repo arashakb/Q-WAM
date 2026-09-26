@@ -1,0 +1,24 @@
+Q-WAM hook in the Fast-WAM RoboTwin policy (upstream FastWAM 45d8e1458921d83f8ad6cf9ce993d371208dabd0).
+
+With QWAM_ENABLE=1, get_model() replaces the block linears of both experts with Q-WAM's simulated
+W4A4 layers once the bf16 checkpoint is loaded. Without it the policy is unchanged (bf16).
+Apply from the FastWAM root with `git apply <this file>`, or run scripts/fastwam/setup_fastwam.sh.
+
+diff --git a/experiments/robotwin/fastwam_policy/deploy_policy.py b/experiments/robotwin/fastwam_policy/deploy_policy.py
+index 3b7f9a2..4fc73a4 100644
+--- a/experiments/robotwin/fastwam_policy/deploy_policy.py
++++ b/experiments/robotwin/fastwam_policy/deploy_policy.py
+@@ -388,6 +388,13 @@ def get_model(usr_args: Dict[str, Any]):
+         timing_enabled=timing_enabled,
+         num_video_frames=(int(cfg.data.train.num_frames) - 1) // int(cfg.data.train.action_video_freq_ratio) + 1,
+     )
++
++    # Q-WAM: replace the block linears of both experts with simulated W4A4 layers (qwam must be
++    # importable; configured through the QWAM_* variables, see qwam.fastwam.install_from_env).
++    if os.environ.get("QWAM_ENABLE", "0").strip() == "1":
++        from qwam.fastwam import install_from_env
++
++        install_from_env(policy.model)
+     return policy
+ 
+ 
