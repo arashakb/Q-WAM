@@ -7,16 +7,17 @@ estimator differentiates the action-mode transformer calls one at a time:
   * Frames: `per_ep` evenly spaced frames of every calibration episode (4 x 50 = 200 in the paper),
     each run through _infer(frame_st_id=0) after a frame-state reset, as in calibration.
   * The video denoising loop runs without gradients. Every action-mode transformer call of the
-    frame (the action denoising steps and the final cache-update call) runs with autograd enabled:
-    its inputs are detached and marked as requiring grad, the parameters require grad, and right
-    after the call `nprobe` Gaussian probes u of the output's shape are backpropagated,
-    g_l = d<out, u>/d x_l, read at the input of every block Linear. The output is then returned
-    detached, so the sampler continues as without the estimator.
-  * J_l is therefore the Jacobian of one call's output (the action prediction of that step) with
-    the rest of the call's state (KV cache, conditioning) held fixed; the contributions of all
-    action-mode calls of all frames are summed. Layers that read the same tensor, such as the q, k
-    and v projections of one attention, are handed the gradient of that shared tensor, i.e. the
-    sum over its consumers.
+    frame (the action denoising steps and the final cache-update call) runs with autograd enabled
+    and with all transformer parameters requiring grad, so the input x_l of every block Linear is
+    a node of that call's graph (the call's inputs are built without gradients and the cached
+    keys/values of earlier calls are constants). Right after the call, `nprobe` Gaussian probes u
+    with the shape of the call's output are backpropagated, g_l = d<out, u>/d x_l, and the output
+    is returned detached, so the sampler continues as without the estimator.
+  * J_l is therefore the Jacobian of one call's output, the action prediction of one denoising step
+    for both classifier-free-guidance halves of the batch, with respect to x_l; it is not taken
+    through the unrolled sampler. The contributions of all action-mode calls of all frames are
+    summed. Layers that read the same tensor, such as the q, k and v projections of one attention,
+    are handed the gradient of that shared tensor, i.e. the sum over its consumers.
   * Instead of the d x d matrix, each layer accumulates the sketch S_l = sum g g^T Omega_l with a
     Gaussian test matrix Omega_l [d, rank + oversample] seeded by the layer name, and
     tr(G_l) = sum |g|^2 in the raw basis.
@@ -108,7 +109,10 @@ def accumulate_sketches(server, files, *, rank: int = 32, oversample: int = 32, 
         if not (kw.get("action_mode") and state["arm"]):
             return orig_forward(*a, **kw)
         with torch.enable_grad():
-            first = a[0]                     # list of per-stream inputs
+            # A tensor, list or tuple first argument is detached and marked as a graph input.
+            # LingBot-VA passes a dict, which reaches the call unchanged: its graph starts at the
+            # parameters, which is why they are set to require grad above.
+            first = a[0]
             if isinstance(first, list):
                 first = [_mark(x) for x in first]
             elif isinstance(first, tuple):
@@ -228,8 +232,8 @@ def build_subspace_file(sketch, trG, stats, targets, act_absmax, *, rank=32, ove
             "nprobe": nprobe, "coverage": round(cov, 4), "skipped_layers": len(skipped),
             "seed": seed,
             "metric": ("per-call action Jacobian: G = sum over sampled frames and action-mode "
-                       "transformer calls of J^T J, J = d(call output)/d(layer input), one "
-                       "Gaussian probe per call, Nystrom sketch"),
+                       "transformer calls of J^T J, J = d(call output)/d(layer input), "
+                       f"{nprobe} Gaussian probe(s) per call, Nystrom sketch"),
             "model": "lingbot-va", "basis": "smoothed+rotated", "alpha": alpha,
             "fwht_block_max": fwht_block_max, "absmax_digest": tensor_digest(act_absmax)}
     return {"subspaces": subs, "trG": trG, "meta": meta}

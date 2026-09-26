@@ -6,8 +6,8 @@ ARM is a run tag (read from <root>/results_<ARM>) or a results directory. The Ro
 one <episode index>_<instruction>_<True|False>.mp4 per episode under stseed-*/visualization/<task>/.
 The success rate of a task is the fraction of successes among episodes 0..n-1; the arm's rate is the
 mean over the 50 tasks. Tasks with fewer than n episodes, a gap in the indices, or duplicated indices
-are reported and left out of the mean. Arms named <x>_clean and <x>_randomized are also paired into
-the average of the two conditions.
+are reported and left out of the mean. Arms named <x>_clean and <x>_randomized (or <x>_rand) are also
+paired into the average of the two conditions.
 """
 import argparse
 import json
@@ -94,8 +94,9 @@ def main():
         rows[tag] = sr
 
     for tag in list(out):
-        if tag.endswith("_clean") and f"{tag[:-6]}_randomized" in out:
-            c, r = out[tag]["success_rate"], out[f"{tag[:-6]}_randomized"]["success_rate"]
+        rand = next((f"{tag[:-6]}{s}" for s in ("_randomized", "_rand") if f"{tag[:-6]}{s}" in out), None)
+        if tag.endswith("_clean") and rand:
+            c, r = out[tag]["success_rate"], out[rand]["success_rate"]
             print(f"{tag[:-6]:32s} clean {c:.2f}  randomized {r:.2f}  avg {(c + r) / 2:.2f}")
     if args.per_task and rows:
         tags = list(rows)

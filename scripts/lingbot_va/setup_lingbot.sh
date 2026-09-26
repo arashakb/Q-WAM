@@ -24,7 +24,10 @@ WEIGHTS_REV=8c9dea8abbc5c91cc9e18bc3264b8915083bbe70
 LINGBOT_CKPT="${LINGBOT_CKPT:-$LINGBOT_ROOT/checkpoints/lingbot-va-posttrain-robotwin}"
 
 checkout() {        # $1 = url, $2 = dir, $3 = commit
-  if [ ! -d "$2/.git" ]; then
+  if [ ! -e "$2/.git" ]; then
+    if [ -n "$(ls -A "$2" 2>/dev/null)" ]; then
+      echo "ERROR: $2 is neither empty nor a git checkout" >&2; exit 1
+    fi
     git clone "$1" "$2"
     git -C "$2" checkout -q "$3"
   fi

@@ -42,7 +42,7 @@ def main():
     args = ap.parse_args()
     if not args.raw_dir:
         ap.error("--raw-dir (or C50_RAW) is required")
-    out = Path(args.out)
+    out = Path(args.out).resolve()          # build_server changes the working directory
     if out.exists() and not args.overwrite:
         print(f"[aog] {out} exists; keeping it (pass --overwrite to recompute)", flush=True)
         return 0
@@ -55,7 +55,7 @@ def main():
     from qwam.lingbot_va.harness import build_server, calib_files
 
     absmax = torch.load(args.absmax, map_location="cpu", weights_only=True)
-    files = calib_files(args.raw_dir)
+    files = calib_files(str(Path(args.raw_dir).resolve()))
     server, _ = build_server("robotwin_i2av", enable_offload=args.offload)
     sketch, trG, stats = accumulate_sketches(
         server, files, rank=args.rank, oversample=args.oversample, per_ep=args.per_ep,

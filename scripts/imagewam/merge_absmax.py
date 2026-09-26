@@ -1,4 +1,4 @@
-"""Merge the per-task activation absmax shards written by the calibration run.
+r"""Merge the per-task activation absmax shards written by the calibration run.
 
   python scripts/imagewam/merge_absmax.py --dir <calib dir> --prefix absmax \
       --out <calib dir>/imagewam_act_absmax_c50.pt --expect-layers 154

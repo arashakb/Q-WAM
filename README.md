@@ -57,7 +57,9 @@ scripts/
   fastwam/  imagewam/  lingbot_va/
                             setup, calibration, AOG estimation, export, RoboTwin evaluation, results
 patches/                    small patches that add the Q-WAM hooks to each upstream repository
-artifacts/                  small calibration artifacts used for the paper results
+artifacts/                  calibration results used for the paper (ImageWAM and LingBot-VA:
+                            activation absmax and rank-32 ASP subspaces)
+docs/                       detailed instructions for each model
 ```
 
 The models themselves are not part of this repository. Each is used from its own upstream
@@ -121,8 +123,9 @@ bash scripts/fastwam/run_qwam.sh randomized all 100
 bash scripts/fastwam/run_bf16.sh clean all 100
 bash scripts/fastwam/run_bf16.sh randomized all 100
 
-# Success rates (one result directory per run)
-python scripts/fastwam/success_rate.py $FASTWAM_ROOT/evaluate_results/robotwin/robotwin_uncond_3cam_384/<run tag>
+# Success rates (one result directory per run; bf16 runs are tagged bf16_<condition>)
+python scripts/fastwam/success_rate.py $FASTWAM_ROOT/evaluate_results/robotwin/robotwin_uncond_3cam_384/qwam_clean
+python scripts/fastwam/success_rate.py $FASTWAM_ROOT/evaluate_results/robotwin/robotwin_uncond_3cam_384/qwam_randomized
 # Bits per weight
 python scripts/fastwam/bpw.py --ckpt $FASTWAM_ROOT/checkpoints/fastwam_release/robotwin_uncond_3cam_384.pt
 ```
@@ -137,30 +140,32 @@ experts can be measured with `scripts/fastwam/run_calibration.sh video-mass` fol
 Details: [docs/imagewam.md](docs/imagewam.md).
 
 ```bash
-export IMAGEWAM_ROOT=/path/to/ImageWAM        # checkout at 00a4e7a, weights downloaded per its README
-bash scripts/imagewam/setup_imagewam.sh       # patches, policy link, .env.local (see docs for FLUX.2 paths)
+export IMAGEWAM_ROOT=/path/to/ImageWAM        # checkout at 00a4e7a; FLUX.2 source, weights, RoboTwin assets per its README
+FLUX2_SRC=/path/to/flux2 PYTHON_BIN=$(which python) \
+  bash scripts/imagewam/setup_imagewam.sh     # policy patch, RoboTwin policy link, .env.local
 
-# 1. Smoothing calibration: activation absmax from one bf16 episode per task
-CALIB_DIR=work/imagewam/calib bash scripts/imagewam/calibrate_absmax.sh
+# 1. Calibration (optional): the activation absmax and the rank-32 ASP subspace file used for the
+#    paper are shipped in artifacts/imagewam/ and used by default. To recompute them, see
+#    docs/imagewam.md (calibrate_absmax.sh, dump_c50_frames.py, build_asp_subspaces.py).
 
-# 2. ASP subspaces: the rank-32 subspace file used for the paper is shipped in
-#    artifacts/imagewam/imagewam_asp_subspaces_r32.pt. To recompute one from the AOG:
-#    python scripts/imagewam/build_asp_subspaces.py --frames-dir work/c50_frames \
-#        --absmax work/imagewam/calib/imagewam_act_absmax_c50.pt --out work/imagewam/subspaces_r32.pt
-
-# 3. Export the W4A4 checkpoint and evaluate it, clean and randomized (50 tasks x 100 episodes)
-IW_ABSMAX=work/imagewam/calib/imagewam_act_absmax_c50.pt bash scripts/imagewam/run_qwam.sh
+# 2. Export the W4A4 checkpoint and evaluate it, clean and randomized (50 tasks x 100 episodes)
+GPU_IDS=0,1,2,3,4,5,6,7 bash scripts/imagewam/run_qwam.sh
 
 # bf16 reference
-bash scripts/imagewam/run_bf16.sh
+GPU_IDS=0,1,2,3,4,5,6,7 bash scripts/imagewam/run_bf16.sh
 
-# Success rates from the per-episode records of one or more runs
-python scripts/imagewam/read_results.py $IMAGEWAM_ROOT/evaluate_results/robotwin/<ckpt tag>/<timestamp>
+# Success rates from the per-episode records (the clean and the randomized run directory)
+python scripts/imagewam/read_results.py <clean run dir> <randomized run dir>
 ```
 
-Component ablation (Table 3): `EXPORT_ARGS="--subspaces none"` (smoothing and rotation) or
-`EXPORT_ARGS="--no-smooth --no-rotate --subspaces none"` (per-group W4A4) with a separate
-`IW_QUANT_CKPT`.
+Component ablation (Table 3), each with its own checkpoint and run label:
+
+```bash
+IW_QUANT_CKPT=work/imagewam/imagewam_w4a4_smoothrot_g32.pt ARM_PREFIX=smoothrot \
+  EXPORT_ARGS="--subspaces none" bash scripts/imagewam/run_qwam.sh
+IW_QUANT_CKPT=work/imagewam/imagewam_w4a4_group_g32.pt ARM_PREFIX=group \
+  EXPORT_ARGS="--no-smooth --no-rotate --subspaces none" bash scripts/imagewam/run_qwam.sh
+```
 
 ## LingBot-VA
 
@@ -174,17 +179,19 @@ bash scripts/lingbot_va/setup_lingbot.sh      # pinned lingbot-va + RoboTwin, pa
 #    for i in 0..6: python scripts/lingbot_va/calibrate_absmax.py --raw-dir work/c50_frames --nshard 7 --shard $i
 #    python scripts/lingbot_va/merge_absmax.py --expect 7
 
-# 2. ASP subspaces from the AOG sketch (one 80 GB GPU, about one hour)
-python scripts/lingbot_va/build_asp_subspaces.py --raw-dir work/c50_frames
+# 2. ASP subspaces: the rank-32 subspace file used for the paper is shipped in
+#    artifacts/lingbot_va/lingbot_va_asp_subspaces_r32.pt and used by default. To recompute one
+#    from the AOG sketch (one 80 GB GPU, about one hour):
+#    python scripts/lingbot_va/build_asp_subspaces.py --raw-dir work/c50_frames
 
-# 3. Export the packed W4A4 checkpoint and evaluate it, clean and randomized
+# 3. Export the packed W4A4 checkpoint, evaluate it clean and randomized, print the success rates
 bash scripts/lingbot_va/run_qwam.sh
 
 # bf16 reference
 bash scripts/lingbot_va/run_bf16.sh
 
-# Success rates
-python scripts/lingbot_va/read_results.py <run tag>_clean <run tag>_randomized
+# Success rates can be re-read at any time
+python scripts/lingbot_va/read_results.py lingbot_qwam_clean lingbot_qwam_randomized
 ```
 
 Component ablation (Table 3): `VARIANT=smoothrot` or `VARIANT=pergroup` for `run_qwam.sh`.
@@ -195,8 +202,11 @@ Component ablation (Table 3): `VARIANT=smoothrot` or `VARIANT=pergroup` for `run
   SmoothQuant alpha 0.5, block Hadamard with block size up to 1024, and ASP rank 32.
 * Evaluation launchers run one task per GPU and resume unfinished runs; see each script's header
   for the GPU selection variables.
-* The ASP subspace depends on random probes. The files in `artifacts/` are the ones used for the
-  paper results; recomputed subspaces give results within the run-to-run variation.
+* The AOG is estimated from random probes. `artifacts/` holds the activation absmax and the ASP
+  subspace files of ImageWAM and LingBot-VA used for the paper; with them, the ImageWAM and
+  LingBot-VA exporters reproduce the evaluated checkpoints byte for byte. Recomputed subspaces are close to, but
+  not bit-identical with, the shipped ones. For Fast-WAM the AOGs are recomputed with
+  `run_calibration.sh`, whose probes are seeded per shard and frame.
 
 ## Acknowledgements
 

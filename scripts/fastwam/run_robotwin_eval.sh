@@ -34,7 +34,8 @@ TAG="${TAG:-eval_$MODE}"
 FRESH="${FRESH:-0}"
 GPUS="${GPUS:-$(nvidia-smi --query-gpu=index --format=csv,noheader 2>/dev/null | tr '\n' ' ' || true)}"
 read -r -a GPU_IDS <<< "${GPUS:-0}"
-for f in "$CKPT" "$STATS"; do [ -f "$f" ] || { echo "missing $f" >&2; exit 1; }; done
+TASK_LIST="$FASTWAM_ROOT/third_party/RoboTwin/task_config/_eval_step_limit.yml"
+for f in "$CKPT" "$STATS" "$TASK_LIST"; do [ -f "$f" ] || { echo "missing $f" >&2; exit 1; }; done
 
 # The entry point names the run directory after the checkpoint file and EVALUATION.output_dir.
 RUN_DIR="$FASTWAM_ROOT/evaluate_results/robotwin/$(basename "$CKPT" .pt)/$TAG"
@@ -88,7 +89,7 @@ pick_dual_bottles stamp_seal lift_pot rotate_qrcode place_mouse_pad open_laptop 
 place_a2b_left place_a2b_right place_shoe place_object_scale place_empty_cup place_object_stand
 place_phone_stand place_container_plate beat_block_hammer shake_bottle shake_bottle_horizontally
 move_playingcard_away press_stapler grab_roller click_alarmclock click_bell"
-mapfile -t ALL < <(grep -E '^[a-z0-9_]+:' third_party/RoboTwin/task_config/_eval_step_limit.yml | sed 's/:.*//')
+mapfile -t ALL < <(grep -E '^[a-z0-9_]+:' "$TASK_LIST" | sed 's/:.*//')
 declare -A KNOWN=() QUEUED=()
 for t in "${ALL[@]}"; do KNOWN[$t]=1; done
 TASKS=()

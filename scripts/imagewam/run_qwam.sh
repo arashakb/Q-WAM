@@ -4,11 +4,11 @@
 # expert with the shipped subspace file), then evaluate it on RoboTwin 2.0, clean and randomized,
 # 50 tasks x 100 episodes each (two runs).
 #
-#   IMAGEWAM_ROOT=<ImageWAM> IW_ABSMAX=<imagewam_act_absmax_c50.pt> [GPU_IDS=0,...,7] \
-#     bash scripts/imagewam/run_qwam.sh
+#   IMAGEWAM_ROOT=<ImageWAM> [GPU_IDS=0,...,7] bash scripts/imagewam/run_qwam.sh
 #
 #   IW_QUANT_CKPT   checkpoint to evaluate; exported first when it does not exist
 #                   (default work/imagewam/imagewam_w4a4_qwam_r32_g32.pt)
+#   IW_ABSMAX       calibration absmax for the export (default: the shipped paper calibration)
 #   EXPORT_ARGS     extra export_qwam.py flags, e.g. the Table 3 rows:
 #                     "--subspaces none"                          smoothing and rotation
 #                     "--no-smooth --no-rotate --subspaces none"  per-group W4A4
@@ -22,12 +22,11 @@ fi
 
 CKPT="${IW_QUANT_CKPT:-${QWAM_ROOT}/work/imagewam/imagewam_w4a4_qwam_r32_g32.pt}"
 if [ ! -f "${CKPT}" ]; then
-  : "${IW_ABSMAX:?set IW_ABSMAX to the merged activation absmax (calibrate_absmax.sh)}"
   # shellcheck disable=SC2086
   PYTHONPATH="${QWAM_ROOT}${PYTHONPATH:+:${PYTHONPATH}}" "${PYTHON_BIN:-python}" \
     "${QWAM_ROOT}/scripts/imagewam/export_qwam.py" \
     --base-ckpt "${IW_BASE_CKPT:-${CKPT_PATH:-${IMAGEWAM_ROOT}/checkpoints/imagewam_release/robotwin/flux2_klein_4b/model.pt}}" \
-    --absmax "${IW_ABSMAX}" --out "${CKPT}" ${EXPORT_ARGS:-}
+    ${IW_ABSMAX:+--absmax "${IW_ABSMAX}"} --out "${CKPT}" ${EXPORT_ARGS:-}
 fi
 
 for PHASE in clean random; do

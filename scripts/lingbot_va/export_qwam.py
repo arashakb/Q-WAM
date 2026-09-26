@@ -8,8 +8,8 @@ ablation (Table 3), all at group 32:
   + smoothing and rotation    --subspaces none
   + ASP (Q-WAM)               defaults
 
-Runs on the CPU (about 25 GB of RAM); only the transformer weights are loaded. Options in brackets
-can also be given through the environment.
+Runs on the CPU (about 15 GB of RAM, a minute or two); only the transformer weights are loaded.
+Options in brackets can also be given through the environment.
 """
 import argparse
 import json
@@ -20,7 +20,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 DEFAULT_ABSMAX = ROOT / "artifacts" / "lingbot_va" / "lingbot_va_act_absmax.pt"
-DEFAULT_SUBSPACES = ROOT / "work" / "lingbot_va" / "lingbot_va_asp_subspaces_r32.pt"
+DEFAULT_SUBSPACES = ROOT / "artifacts" / "lingbot_va" / "lingbot_va_asp_subspaces_r32.pt"
 
 
 def _env_flag(name, default=True):

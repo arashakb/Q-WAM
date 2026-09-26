@@ -5,9 +5,9 @@ inference server is built in-process without torch.distributed, so the transform
 sharded and forward hooks see the plain nn.Linear modules.
 
 Calibration frames are the raw per-camera dumps of scripts/common/dump_c50_frames.py (one
-ep<episode>.npz per calibration episode, 320x240 uint8 per camera). They are fed to the server the
-way the RoboTwin client feeds observations: the three camera images at 320x224, the instruction
-through _reset.
+ep<episode>.npz per calibration episode, 320x240 uint8 per camera). Each frame is passed to _infer as
+the three camera images resized to 320x224 (the size of the upstream example observations; the server
+resizes every camera to its own input resolution), with the instruction set through _reset.
 """
 from __future__ import annotations
 
@@ -41,7 +41,8 @@ def _import_path(root: Path):
 
 def build_server(config_name: str = "robotwin_i2av", enable_offload: bool = False,
                  save_root: str | None = None):
-    """(VA_Server, config) on cuda:0, without distributed initialization."""
+    """(VA_Server, config) on cuda:0, without distributed initialization. Changes the working
+    directory to $LINGBOT_ROOT, as the upstream configs use paths relative to it."""
     root = lingbot_root()
     _import_path(root)
     os.chdir(root)                       # the i2av config reads its example images relative to it
@@ -53,7 +54,7 @@ def build_server(config_name: str = "robotwin_i2av", enable_offload: bool = Fals
     config.local_rank = 0
     config.world_size = 0
     # _reset/_infer write per-frame debug tensors under save_root; keep them out of the checkout.
-    config.save_root = save_root or os.path.join(tempfile.gettempdir(), "qwam_lingbot_va")
+    config.save_root = save_root or os.path.join(tempfile.gettempdir(), f"qwam_lingbot_va_{os.getpid()}")
     os.makedirs(config.save_root, exist_ok=True)
     config.enable_offload = enable_offload
     print(f"[harness] building VA_Server({config_name!r}, offload={enable_offload})", flush=True)

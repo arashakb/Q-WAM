@@ -43,4 +43,10 @@ else
   ln -s "$POLICY" "$LINK"
 fi
 echo "[setup] RoboTwin policy link: $LINK -> $POLICY"
+
+# RoboTwin's task_config/ (task list, clean/randomized settings) is not tracked in FastWAM's copy.
+for f in _eval_step_limit.yml demo_clean.yml demo_randomized.yml; do
+  [ -f "$FASTWAM_ROOT/third_party/RoboTwin/task_config/$f" ] || \
+    echo "WARNING: third_party/RoboTwin/task_config/$f is missing; copy task_config/ from the RoboTwin repository before evaluating" >&2
+done
 echo "[setup] done. qwam is put on PYTHONPATH by scripts/fastwam/run_robotwin_eval.sh."

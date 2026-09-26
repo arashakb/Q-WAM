@@ -40,7 +40,7 @@ def main():
     if not 0 <= args.shard < args.nshard:
         ap.error(f"--shard must be in [0, {args.nshard})")
 
-    out = Path(args.out)
+    out = Path(args.out).resolve()          # build_server changes the working directory
     if args.nshard > 1:
         out = out.with_name(f"{out.stem}_shard{args.shard}.pt")
     if out.exists() and not args.overwrite:
@@ -51,7 +51,7 @@ def main():
     from qwam.lingbot_va.calib import calibrate_absmax
     from qwam.lingbot_va.harness import build_server, calib_files
 
-    files = calib_files(args.raw_dir)[args.shard::args.nshard]
+    files = calib_files(str(Path(args.raw_dir).resolve()))[args.shard::args.nshard]
     server, _ = build_server("robotwin_i2av", enable_offload=args.offload)
     park = (not args.offload) if args.park is None else args.park
     try:

@@ -168,7 +168,7 @@ def export_checkpoint(base_ckpt, out, absmax=None, subspaces=None, rank=32, smoo
         blob = torch.load(absmax, map_location="cpu", weights_only=False)
         act = blob["absmax"] if isinstance(blob, dict) and "absmax" in blob else blob
         missing = [n for n in names if n not in act]
-        if len(missing) > 0.001 * len(names):
+        if missing:
             raise SystemExit(f"absmax lacks {len(missing)}/{len(names)} target Linears, "
                              f"e.g. {missing[:3]}")
         ntask = len(blob.get("tasks", [])) if isinstance(blob, dict) else 0
@@ -178,11 +178,14 @@ def export_checkpoint(base_ckpt, out, absmax=None, subspaces=None, rank=32, smoo
     bases, smeta = {}, None
     if use_asp:
         bases, smeta = load_subspaces(subspaces, rank, alpha)
+        off_scope = [n for n in names if n in bases and not n.startswith("mixtures.action.")]
+        if off_scope:
+            raise SystemExit(f"{subspaces} has bases outside the action expert: {off_scope[:3]}")
         print(f"[export] ASP rank {rank} on {sum(n in bases for n in names)} action-expert Linears "
               f"({smeta.get('episodes_represented')}/{smeta.get('episode_files')} episodes, "
               f"{smeta.get('frames')} frames)", flush=True)
 
-    payload, lr_bits, n_asp, t0 = {}, 0, 0, time.time()
+    payload, branch_bits, n_asp, t0 = {}, 0, 0, time.time()
     for j, n in enumerate(names):
         V = bases.get(n)
         ent = quantize_linear(mot[f"{n}.weight"], act[n].float() if smooth else None, V=V,
@@ -190,7 +193,7 @@ def export_checkpoint(base_ckpt, out, absmax=None, subspaces=None, rank=32, smoo
                               w_group=w_group, alpha=alpha, rotate=rotate,
                               fwht_block_max=fwht_block_max)
         if V is not None:
-            lr_bits += rank * (ent["out_features"] + ent["in_features"]) * 16
+            branch_bits += rank * (ent["out_features"] + ent["in_features"]) * 16
             n_asp += 1
         payload[n] = ent
         if (j + 1) % 40 == 0:
@@ -209,8 +212,8 @@ def export_checkpoint(base_ckpt, out, absmax=None, subspaces=None, rank=32, smoo
         "asp_ortho": use_asp, "asp_expert": "action" if use_asp else None,
         "asp_layers": n_asp, "rank": rank if use_asp else 0,
         "asp_subspaces": Path(subspaces).name if use_asp else None,
-        "asp_branch_overhead_bits": lr_bits,
-        "bpw_with_asp_branch": round((wbits + lr_bits) / nparams, 4),
+        "asp_branch_overhead_bits": branch_bits,
+        "bpw_with_asp_branch": round((wbits + branch_bits) / nparams, 4),
         "bpw_weights_only": round(wbits / nparams, 4),
         "asp_runtime_contract": ASP_CONTRACT if use_asp else "n/a (rank 0)",
         "w_bits": w_bits, "a_bits": a_bits, "w_group": w_group, "a_group": a_group,
@@ -250,7 +253,7 @@ def dequant_weight(e):
 def verify_export(payload, mot, per_kind=3, seed=0):
     """Relative error of the stored form against x W^T on random inputs (weight rounding only).
 
-    A few percent is INT4 weight noise; a value near or above 1 means the stored form does not
+    About 0.1-0.3 is INT4 weight noise on random inputs; above 0.5 means the stored form does not
     match the rotation/deflation contract.
     """
     gen = torch.Generator().manual_seed(seed)

@@ -1,4 +1,4 @@
-"""Action-output Gram (AOG) and per-layer ASP subspaces for ImageWAM's action expert (one GPU).
+r"""Action-output Gram (AOG) and per-layer ASP subspaces for ImageWAM's action expert (one GPU).
 
 For every Linear l of the action expert, with x_l its input activation:
 
@@ -19,7 +19,7 @@ scripts/common/dump_c50_frames.py (default 2 per episode, 100 frames; 0 = all fr
 
   set -a; source $IMAGEWAM_ROOT/.env.local; set +a
   python scripts/imagewam/build_asp_subspaces.py --frames-dir <c50 frames> \
-      --absmax <imagewam_act_absmax_c50.pt> --out <imagewam_asp_subspaces_r32.pt>
+      --out <imagewam_asp_subspaces_r32.pt>
 """
 import argparse
 import glob
@@ -46,8 +46,9 @@ ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDe
 ap.add_argument("--imagewam-root", default=os.environ.get("IMAGEWAM_ROOT"))
 ap.add_argument("--frames-dir", default=os.environ.get("C50_RAW"),
                 help="calibration frames (ep*.npz) from scripts/common/dump_c50_frames.py [C50_RAW]")
-ap.add_argument("--absmax", default=os.environ.get("IW_ABSMAX"),
-                help="merged activation absmax [IW_ABSMAX]")
+ap.add_argument("--absmax", default=os.environ.get("IW_ABSMAX", str(
+    Path(__file__).resolve().parents[2] / "artifacts/imagewam/imagewam_act_absmax_c50.pt")),
+                help="merged activation absmax; default: the shipped calibration [IW_ABSMAX]")
 ap.add_argument("--ckpt", default=None, help="default: $CKPT_PATH or the released RoboTwin model.pt")
 ap.add_argument("--dataset-stats", default=None, help="default: $DATASET_STATS_PATH or next to --ckpt")
 ap.add_argument("--flux2-src", default=os.environ.get("FLUX2_SRC"))
@@ -64,11 +65,16 @@ args = ap.parse_args()
 for k in ("imagewam_root", "frames_dir", "absmax", "flux2_src", "flux2_model", "flux2_ae"):
     if not getattr(args, k):
         ap.error(f"--{k.replace('_', '-')} is required (or its environment variable)")
-IW = str(Path(args.imagewam_root).resolve())
-CKPT = args.ckpt or os.environ.get("CKPT_PATH") or \
-    f"{IW}/checkpoints/imagewam_release/robotwin/flux2_klein_4b/model.pt"
-STATS = args.dataset_stats or os.environ.get("DATASET_STATS_PATH") or \
-    str(Path(CKPT).with_name("dataset_stats.json"))
+# the policy is built from the ImageWAM root, so every user path is made absolute first
+for k in ("imagewam_root", "frames_dir", "absmax", "ckpt", "dataset_stats", "flux2_src",
+          "flux2_model", "flux2_ae", "out"):
+    if getattr(args, k):
+        setattr(args, k, str(Path(getattr(args, k)).resolve()))
+IW = args.imagewam_root
+CKPT = str(Path(args.ckpt or os.environ.get("CKPT_PATH")
+                or f"{IW}/checkpoints/imagewam_release/robotwin/flux2_klein_4b/model.pt").resolve())
+STATS = str(Path(args.dataset_stats or os.environ.get("DATASET_STATS_PATH")
+                 or Path(CKPT).with_name("dataset_stats.json")).resolve())
 
 sys.path.insert(0, f"{IW}/src")
 sys.path.insert(0, f"{IW}/experiments/robotwin")

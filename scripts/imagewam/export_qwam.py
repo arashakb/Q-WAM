@@ -1,11 +1,14 @@
 """Export a W4A4 ImageWAM checkpoint. Defaults are the paper configuration (Q-WAM, Table 1).
 
-  python scripts/imagewam/export_qwam.py --base-ckpt <model.pt> --absmax <absmax.pt> --out <ckpt.pt>
+  python scripts/imagewam/export_qwam.py --base-ckpt <model.pt> --out <ckpt.pt>
 
 Component ablation (Table 3), all at weight/activation group 32:
   per-group W4A4              --no-smooth --no-rotate --subspaces none
   + smoothing and rotation    --subspaces none
   + ASP (Q-WAM)               defaults (shipped rank-32 subspace file)
+
+The shipped calibration absmax and subspace file are the ones used in the paper; --absmax and
+--subspaces select recomputed ones.
 
 Every option can also be given through the environment variable in brackets.
 """
@@ -18,6 +21,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from qwam.imagewam.export import export_checkpoint  # noqa: E402
 
+DEFAULT_ABSMAX = ROOT / "artifacts" / "imagewam" / "imagewam_act_absmax_c50.pt"
 DEFAULT_SUBSPACES = ROOT / "artifacts" / "imagewam" / "imagewam_asp_subspaces_r32.pt"
 
 
@@ -40,8 +44,8 @@ def main():
     ap.add_argument("--base-ckpt", default=_default_base_ckpt(),
                     help="released ImageWAM RoboTwin model.pt [IW_BASE_CKPT; "
                          "default $IMAGEWAM_ROOT/checkpoints/imagewam_release/robotwin/flux2_klein_4b/model.pt]")
-    ap.add_argument("--absmax", default=os.environ.get("IW_ABSMAX"),
-                    help="merged activation absmax from calibrate_absmax.sh [IW_ABSMAX]")
+    ap.add_argument("--absmax", default=os.environ.get("IW_ABSMAX", str(DEFAULT_ABSMAX)),
+                    help="merged activation absmax; default: the shipped calibration [IW_ABSMAX]")
     ap.add_argument("--out", default=os.environ.get("IW_OUT"), help="output checkpoint [IW_OUT]")
     ap.add_argument("--subspaces", default=os.environ.get("IW_ASP_SUBSPACES", str(DEFAULT_SUBSPACES)),
                     help="ASP subspace file, or 'none' for rank 0 [IW_ASP_SUBSPACES]")

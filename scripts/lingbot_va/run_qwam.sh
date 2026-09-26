@@ -7,7 +7,8 @@
 #                    smoothrot smoothing + rotation, no ASP        (Table 3)
 #                    pergroup  per-group W4A4 only                 (Table 3)
 #   SUBSPACES        ASP subspace file for VARIANT=qwam
-#                    (default work/lingbot_va/lingbot_va_asp_subspaces_r32.pt, build_asp_subspaces.py)
+#                    (default artifacts/lingbot_va/lingbot_va_asp_subspaces_r32.pt, the file of the paper;
+#                    build_asp_subspaces.py recomputes one)
 #   ABSMAX           activation absmax (default artifacts/lingbot_va/lingbot_va_act_absmax.pt)
 #   CKPT             checkpoint path (default work/lingbot_va/lingbot_va_w4a4_<VARIANT>.pt)
 #   NGPU, GPU_IDS, START_PORT, MASTER_PORT, PYTHON, ROBOTWIN_ROOT   passed to run_8gpu_queue.sh
@@ -24,7 +25,7 @@ WORK="${WORK:-$QWAM_ROOT/work/lingbot_va}"
 VARIANT="${VARIANT:-qwam}"
 TEST_NUM="${TEST_NUM:-50}"
 ABSMAX="${ABSMAX:-$QWAM_ROOT/artifacts/lingbot_va/lingbot_va_act_absmax.pt}"
-SUBSPACES="${SUBSPACES:-$WORK/lingbot_va_asp_subspaces_r32.pt}"
+SUBSPACES="${SUBSPACES:-$QWAM_ROOT/artifacts/lingbot_va/lingbot_va_asp_subspaces_r32.pt}"
 case "$VARIANT" in
   qwam)      EXPORT_ARGS=(--subspaces "$SUBSPACES") ;;
   smoothrot) EXPORT_ARGS=(--subspaces none) ;;
